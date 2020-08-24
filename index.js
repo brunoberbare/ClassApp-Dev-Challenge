@@ -24,6 +24,7 @@ class Student {
             classes.push(this.classes);
             this.classes = classes;
         }
+        // Caso ainda não possua essa classe ele adiciona no array
         if (_.findIndex(this.classes, o => o.classe === classe) === -1) {
             this.classes.push(classe);
         }
@@ -43,7 +44,8 @@ class Address {
     }
 
     addTag(tag) {
-        if (_.indexOf(this.tags, tag) === -1) {
+        // Caso ainda não possua essa tag ele adiciona no array
+        if (_.findIndex(this.tags, o => o.tag === tag) === -1) {
             this.tags.push(tag);
         }
     }
@@ -106,10 +108,12 @@ class StudentsParser {
         const input = this.readInput(inputFile);
         const records = this.csvParse(input);
 
+        // Para cada linha de informação de input.csv
         for (let record of records) {
 
             let student = this.findStudent(record['eid']);
 
+            // Caso não encontre o estudante pelo seu eid, cria outro
             if (student === undefined) {
 
                 this.students.push(new Student(record['eid'], record['fullname']));
@@ -118,8 +122,12 @@ class StudentsParser {
             delete(record['eid']);
             delete(record['fullname']);
 
+            // Para cada coluna class de input.csv
             for (let classes of record['class']) {
                 if (classes !== '') {
+                    // Divide em pedaços as strings que contém valores separados por barra 
+                    // ou vírgula e retorna os valores em um array.
+                    // ex: 'Sala 1 / Sala 2' => ['Sala 1', 'Sala 2']
                     let splitClasses = StudentsParser.splitString(classes, '/', ',');
                     for (let eachClass of splitClasses) {
                         student.addClass(eachClass);
@@ -128,25 +136,35 @@ class StudentsParser {
             }
             delete(record['class']);
 
+            // Caso o campo 'invisible' esteja vazio ele é ignorado
             if (record['invisible'] !== '')
                 student.invisible = this.getBoolean(record['invisible']);
             delete(record['invisible']);
 
+            // Caso o campo 'see_all' esteja vazio ele é ignorado
             if (record['see_all'] !== '')
                 student.see_all = this.getBoolean(record['see_all']);
             delete(record['see_all']);
 
+            // Para cada coluna de endereço
             for (let obj in record) {
+
+                // Divide em pedaços a string de endereços que contém valores separados por barra 
+                // ou vírgula e retorna os valores em um array
                 let splitAddresses = StudentsParser.splitString(record[obj], '/', ',');
+
                 for (let eachAddress of splitAddresses) {
 
                     let address = this.findAddress(student, eachAddress);
 
+                    // Caso não encontre esse endereço dentro de estudante, cria um novo 
+                    // e o adiciona caso seja um endereço válido
                     if (address === undefined) {
                         address = new Address(obj, eachAddress);
                         if (address.isAddressValid()) {
                             student.addAdress(address);
                         }
+                    // Caso encontre, junta suas tags
                     } else {
                         let splitTags = address.getAddressTags(obj);
                         for (let eachTag of splitTags) {
