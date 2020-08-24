@@ -1,12 +1,11 @@
 const fs = require('fs');
-const parse = require('csv-parse/lib/sync');
+const csv = require('csv-parse/lib/sync');
 const _ = require('lodash');
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
-var validator = require("email-validator");
-
-
+const validator = require("email-validator");
 
 class Student {
+
     constructor(eid, fullname) {
         this.fullname = fullname;
         this.eid = eid;
@@ -36,9 +35,10 @@ class Student {
 }
 
 class Address {
+
     constructor(typeAndTags, address) {
-        this.type = getAddressType(typeAndTags);
-        this.tags = getAddressTags(typeAndTags);
+        this.type = this.getAddressType(typeAndTags);
+        this.tags = this.getAddressTags(typeAndTags);
         this.address = address;
     }
 
@@ -75,6 +75,18 @@ class Address {
         return validator.validate(this.address);
     }
 
+    getAddressType(string) {
+
+        return _.split(string, ' ')[0];
+    }
+
+    getAddressTags(string) {
+
+        let type = this.getAddressType(string);
+        string = string.slice(type.length+1);
+        return StudentsParser.splitString(string, '/', ',');
+    }
+
     formatedPhone(number) {
 
         let formatedNumber = '' + number.getCountryCode() + number.getNationalNumber();
@@ -83,137 +95,137 @@ class Address {
     }
 }
 
+class StudentsParser {
 
-
-// Lê o arquivo input.csv
-const input = fs.readFileSync('./input.csv', 'utf-8', (err, fileContent) => {
-    if(err) {
-        throw new Error(err);
+    constructor() {
+        this.students = [];
     }
-    return fileContent;
-});
 
-// Transforma o input em objetos js
-const records = parse(input, {
-    columns: true,
-    columns_duplicates_to_array: true,
-    skip_empty_lines: true
-});
+    parse(inputFile, outputFile) {
 
-// Arruma o objeto para o formato de Student
-let students = [];
-for (record of records) {
+        const input = this.readInput(inputFile);
+        const records = this.csvParse(input);
 
-    let student = findStudent(record['eid']);
+        for (let record of records) {
 
-    if (student === undefined) {
+            let student = this.findStudent(record['eid']);
 
-        students.push(new Student(record['eid'], record['fullname']));
-        student = findStudent(record['eid'])
-    }
-    delete(record['eid']);
-    delete(record['fullname']);
+            if (student === undefined) {
 
-    for (classes of record['class']) {
-        if (classes !== '') {
-            let splitClasses = splitString(classes);
-            for (eachClass of splitClasses) {
-                student.addClass(eachClass);
+                this.students.push(new Student(record['eid'], record['fullname']));
+                student = this.findStudent(record['eid'])
             }
-        }
-    }
-    delete(record['class']);
+            delete(record['eid']);
+            delete(record['fullname']);
 
-    if (record['invisible'] !== '')
-        student.invisible = getBoolean(record['invisible']);
-    delete(record['invisible']);
-
-    if (record['see_all'] !== '')
-        student.see_all = getBoolean(record['see_all']);
-    delete(record['see_all']);
-
-    for (obj in record) {
-        let splitAddresses = splitString(record[obj]);
-        for (eachAddress of splitAddresses) {
-
-            let address = findAddress(student, eachAddress);
-
-            if (address === undefined) {
-                address = new Address(obj, eachAddress);
-                if (address.isAddressValid()) {
-                    student.addAdress(address);
-                }
-            } else {
-                let splitTags = getAddressTags(obj);
-                for (eachTag of splitTags) {
-                    address.addTag(eachTag);
+            for (let classes of record['class']) {
+                if (classes !== '') {
+                    let splitClasses = StudentsParser.splitString(classes, '/', ',');
+                    for (let eachClass of splitClasses) {
+                        student.addClass(eachClass);
+                    }
                 }
             }
+            delete(record['class']);
+
+            if (record['invisible'] !== '')
+                student.invisible = this.getBoolean(record['invisible']);
+            delete(record['invisible']);
+
+            if (record['see_all'] !== '')
+                student.see_all = this.getBoolean(record['see_all']);
+            delete(record['see_all']);
+
+            for (let obj in record) {
+                let splitAddresses = StudentsParser.splitString(record[obj], '/', ',');
+                for (let eachAddress of splitAddresses) {
+
+                    let address = this.findAddress(student, eachAddress);
+
+                    if (address === undefined) {
+                        address = new Address(obj, eachAddress);
+                        if (address.isAddressValid()) {
+                            student.addAdress(address);
+                        }
+                    } else {
+                        let splitTags = address.getAddressTags(obj);
+                        for (let eachTag of splitTags) {
+                            address.addTag(eachTag);
+                        }
+                    }
+                }
+                delete(record[obj]);
+            }
         }
-        delete(record[obj]);
+        this.writeOutput(this.students, outputFile);
     }
-    delete(record);
-}
 
-writeOutput(students, 'output.json');
-
-
-
-// Transforma em json
-function writeOutput(objects, fileName) {
-
-    let data = JSON.stringify(objects, null, 2);
-    fs.writeFile(fileName, data, function(err) {});
-}
-
-// Separa string, que contenha '/' e/ou ',' como separadores, em um array de strings
-function splitString(string) {
-
-    let result = [];
-    let resultAux = _.split(string, '/');
-
-    _.forEach(resultAux, obj => {
-        obj = _.split(obj, ',');
-        _.forEach(obj, objAux => {
-            result.push(objAux);
+    readInput(inputFile) {
+        const input = fs.readFileSync('./' + inputFile, 'utf-8', (err, fileContent) => {
+            if(err) {
+                throw new Error('Arquivo não encontrado');
+            }
+            return fileContent;
         });
-    });
-    return _.map(result, _.trim);
-}
+        return input;
+    }
 
-function findStudent(eid) {
+    csvParse(input) {
+        const records = csv(input, {
+            columns: true,
+            columns_duplicates_to_array: true,
+            skip_empty_lines: true
+        });
+        return records;
+    }
 
-    return _.find(students, o => o.eid === eid);
-}
+    writeOutput(array, fileName) {
 
-function findAddress(student, address) {
-    
-    return _.find(student.addresses, o => o.address === address);
-}
+        let data = JSON.stringify(array, null, 2);
+        fs.writeFile(fileName, data, function(err) {});
+    }
 
-function getAddressType(string) {
+    // Separa string, que contenha 'separator1' e/ou 'separator2' como separadores, em um array de strings
+    static splitString(string, separator1, separator2) {
 
-    return _.split(string, ' ')[0];
-}
+        let result = [];
+        let resultAux = _.split(string, separator1);
 
-function getAddressTags(string) {
+        _.forEach(resultAux, obj => {
+            obj = _.split(obj, separator2);
+            _.forEach(obj, objAux => {
+                result.push(objAux);
+            });
+        });
+        return _.map(result, _.trim);
+    }
 
-    let type = getAddressType(string);
-    string = string.slice(type.length+1);
-    return splitString(string);
-}
+    findStudent(eid) {
 
-function getBoolean(value)  {
+        return _.find(this.students, o => o.eid === eid);
+    }
 
-    switch(value) {
-        case true:
-        case "true":
-        case 1:
-        case "1":
-        case "on":
-        case "yes":
-            return true;
-        default: 
-            return false;
+    findAddress(student, address) {
+        
+        return _.find(student.addresses, o => o.address === address);
+    }
+
+    getBoolean(value)  {
+
+        switch(value) {
+            case true:
+            case "true":
+            case 1:
+            case "1":
+            case "on":
+            case "yes":
+                return true;
+            default: 
+                return false;
+        }
     }
 }
+
+
+let studentsParser = new StudentsParser();
+studentsParser.parse('input.csv', 'output.json');
