@@ -10,14 +10,22 @@ class Student {
     constructor(eid, fullname) {
         this.fullname = fullname;
         this.eid = eid;
-        this.classes = [];
+        this.classes = '';
         this.addresses = [];
         this.invisible = false;
         this.see_all = false;
     }
 
     addClass(classe) {
-        if (_.indexOf(this.classes, classe) === -1) {
+        if (this.classes === '') {
+            this.classes = classe;
+            return;
+        } else if (!Array.isArray(this.classes)) {
+            let classes = [];
+            classes.push(this.classes);
+            this.classes = classes;
+        }
+        if (_.findIndex(this.classes, o => o.classe === classe) === -1) {
             this.classes.push(classe);
         }
     }
