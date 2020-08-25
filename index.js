@@ -25,7 +25,7 @@ class Student {
             this.classes = classes;
         }
         // Caso ainda não possua essa classe ele adiciona no array
-        if (_.findIndex(this.classes, o => o.classe === classe) === -1) {
+        if (!_.includes(this.classes, classe)) {
             this.classes.push(classe);
         }
     }
@@ -45,7 +45,7 @@ class Address {
 
     addTag(tag) {
         // Caso ainda não possua essa tag ele adiciona no array
-        if (_.findIndex(this.tags, o => o.tag === tag) === -1) {
+        if (!_.includes(this.tags, tag)) {
             this.tags.push(tag);
         }
     }
